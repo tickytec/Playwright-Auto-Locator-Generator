@@ -1,47 +1,41 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Playwright Tools</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        /* Стили остаются такими же, как в предыдущем ответе */
-        body { font-family: 'Roboto', sans-serif; width: 380px; padding: 10px; background-color: #f4f5f7; color: #172b4d; }
-        h3 { margin-top: 0; margin-bottom: 15px; color: #091e42; border-bottom: 1px solid #dfe1e6; padding-bottom: 8px; font-size: 16px; }
-        .section { background-color: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        button { background-color: #0052cc; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; width: 100%; font-weight: 500; transition: background-color 0.2s; margin-top: 10px; }
-        button:hover { background-color: #0065ff; }
-        input[type="text"] { width: calc(100% - 22px); padding: 8px 10px; border: 1px solid #dfe1e6; border-radius: 3px; margin-bottom: 10px; }
-        #locatorOutput, #message { background-color: #f4f5f7; padding: 10px; border-radius: 3px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; word-wrap: break-word; min-height: 20px; margin-top: 10px; color: #42526e; }
-        #copyLocatorButton { background-color: #00875a; }
-        #copyLocatorButton:hover { background-color: #009966; }
-        .framework-selector { display: flex; justify-content: center; margin-bottom: 10px; border: 1px solid #dfe1e6; border-radius: 5px; overflow: hidden; }
-        .framework-selector label { flex: 1; text-align: center; padding: 8px; cursor: pointer; background-color: #f4f5f7; color: #42526e; transition: background-color 0.2s; }
-        .framework-selector input[type="radio"] { display: none; }
-        .framework-selector input[type="radio"]:checked + label { background-color: #0052cc; color: white; font-weight: 500; }
-    </style>
+    <meta charset="UTF-8">
+    <title>Playwright Locator Assistant</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-    <div class="section">
-        <h3>Locator Generator</h3>
-        <div class="framework-selector">
-            <input type="radio" id="pytest" name="framework" value="pytest" checked>
-            <label for="pytest">Pytest</label>
-            <input type="radio" id="js" name="framework" value="js">
-            <label for="js">JavaScript</label>
+    <div class="container">
+        <header class="header">
+            <img src="icons/icon48.png" alt="logo" class="logo">
+            <h1>Locator Assistant</h1>
+        </header>
+
+        <div class="section">
+            <h2>1. Generate Locator</h2>
+            <div id="locatorOutput">Click "Pick Element" to start.</div>
+            <div class="framework-selector">
+                <label><input type="radio" name="framework" value="pytest" id="pytest" checked> Pytest</label>
+                <label><input type="radio" name="framework" value="js" id="js"> JS</label>
+            </div>
+            <div class="button-group">
+                <button id="pickElementButton" class="btn btn-primary">Pick Element</button>
+                <button id="copyLocatorButton" class="btn" style="display: none;">Copy Locator</button>
+            </div>
         </div>
-        <button id="pickElementButton">Pick Element</button>
-        <div id="locatorOutput">Click "Pick Element" to start.</div>
-        <button id="copyLocatorButton" style="display:none;">Copy Locator</button>
+
+        <div class="divider"></div>
+
+        <div class="section">
+            <h2>2. Verify Selector</h2>
+            <input type="text" id="locatorInput" placeholder="Enter CSS or Playwright locator...">
+            <button id="checkButton" class="btn">Check Selector</button>
+            <div id="message" style="display: none;"></div>
+        </div>
     </div>
 
-    <div class="section">
-        <h3>Selector Verifier</h3>
-        <input type="text" id="locatorInput" placeholder="Enter CSS selector (e.g., div.item)">
-        <button id="checkButton">Check Selector</button>
-        <div id="message" style="display: none;"></div>
-    </div>
-
+    <script src="popup.js"></script>
 </body>
-<script src="popup.js"></script>
 </html>

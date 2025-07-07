@@ -1,22 +1,30 @@
 {
-    "manifest_version": 3,
-    "name": "Playwright Locator Generator",
-    "version": "1.13",
-    "description": "Generate Playwright locators by picking elements on the page for Python and JavaScript.",
-    "action": {
-        "default_popup": "popup.html",
-        "default_icon": {
-            "16": "icons/icon16.png",
-            "48": "icons/icon48.png",
-            "128": "icons/icon128.png"
-        }
-    },
-    "permissions": ["activeTab", "scripting", "storage"],
-    "host_permissions": ["<all_urls>"],
-    "content_scripts": [
-        {
-            "matches": ["<all_urls>"],
-            "js": ["content.js"]
-        }
-    ]
+  "manifest_version": 3,
+  "name": "Playwright Locator Assistant",
+  "version": "1.0.0",
+  "description": "Instantly generate and verify the best Playwright locators for any element on the page.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
 }

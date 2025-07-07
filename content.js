@@ -1,30 +1,23 @@
 /**
- * @file Content script for a Chrome extension that generates optimal Playwright locators.
- * It features an element picking mode, advanced locator generation strategies including chaining,
- * and a user-friendly UI for displaying and copying the generated locator.
+ * @file content.js
+ * This script is injected into web pages. It handles two main features:
+ * 1. The "Locator Generator": An element picking mode to automatically generate a stable Playwright locator.
+ * 2. The "Selector Verifier": An engine to find and highlight elements on the page based on a manually entered locator string (CSS or Playwright).
  */
 
+// --- STATE VARIABLES ---
 let isPickingMode = false;
 let locatorDisplayDiv = null;
-let currentFramework = 'pytest'; // 'pytest' or 'js'
+let currentFramework = 'pytest';
 
-// --- UTILITY AND VALIDATION FUNCTIONS ---
+// --- UTILITY FUNCTIONS ---
 
-/**
- * Determines the implicit ARIA role of an element based on its tag name and attributes.
- * This is a comprehensive mapping based on ARIA in HTML specification.
- * @param {Element} element - The DOM element.
- * @returns {string|null} - The inferred ARIA role or null.
- */
 function getImplicitRole(element) {
     const tagName = element.tagName.toLowerCase();
     const type = element.getAttribute('type');
-
-    // Explicit role always takes precedence.
     const explicitRole = element.getAttribute('role');
     if (explicitRole) return explicitRole;
 
-    // Role mapping based on tag name.
     const roleMappings = {
         'a': 'link', 'area': 'link', 'button': 'button',
         'h1': 'heading', 'h2': 'heading', 'h3': 'heading', 'h4': 'heading', 'h5': 'heading', 'h6': 'heading',
@@ -37,10 +30,8 @@ function getImplicitRole(element) {
         'article': 'article', 'aside': 'complementary', 'footer': 'contentinfo', 'header': 'banner', 'main': 'main', 'section': 'region',
         'summary': 'button', 'details': 'group',
     };
-
     if (roleMappings[tagName]) return roleMappings[tagName];
 
-    // Role mapping for <input> based on its type.
     if (tagName === 'input') {
         const inputTypeRoles = {
             'button': 'button', 'submit': 'button', 'reset': 'button',
@@ -49,18 +40,11 @@ function getImplicitRole(element) {
             'tel': 'textbox', 'url': 'textbox', 'number': 'spinbutton', 'range': 'slider',
             'date': 'textbox', 'time': 'textbox', 'datetime-local': 'textbox'
         };
-        // Default to 'textbox' for other text-like inputs, otherwise null.
         return inputTypeRoles[type] || 'textbox';
     }
-
     return null;
 }
 
-/**
- * Calculates the accessible name for a DOM element.
- * @param {Element} element - The DOM element.
- * @returns {string} - The calculated accessible name, trimmed.
- */
 function getAccessibleName(element) {
     const ariaLabel = element.getAttribute('aria-label');
     if (ariaLabel) return ariaLabel.trim();
@@ -70,16 +54,25 @@ function getAccessibleName(element) {
         if (label) return (label.innerText || label.textContent).trim();
     }
 
-    if (element.tagName.toLowerCase() === 'img') {
+    const tagName = element.tagName.toLowerCase();
+    const type = element.getAttribute('type');
+
+    // =================================================================
+    // ADDED THIS BLOCK TO CORRECTLY GET THE NAME FROM <input type="submit">
+    // =================================================================
+    if (tagName === 'input' && ['submit', 'button', 'reset'].includes(type)) {
+        if (element.value) {
+            return element.value.trim();
+        }
+    }
+
+    if (tagName === 'img') {
         const altText = element.getAttribute('alt');
         if (altText) return altText.trim();
     }
 
-    // Use innerText as it respects visibility, but limit length.
     const text = (element.innerText || "").trim().replace(/\s+/g, ' ');
-    if (text && text.length < 120) {
-        return text;
-    }
+    if (text && text.length < 120) return text;
     
     const title = element.getAttribute('title');
     if (title) return title.trim();
@@ -87,21 +80,11 @@ function getAccessibleName(element) {
     return '';
 }
 
-/**
- * Generates a simple, relative CSS selector for an element.
- * @param {Element} element - The target element.
- * @param {Element} parent - The parent to be relative to.
- * @returns {string} - A simple CSS selector.
- */
 function getRelativeCSS(element, parent) {
     let selector = element.tagName.toLowerCase();
-    
-    // Use classes for specificity, ignoring dynamic/framework-specific ones.
     const stableClasses = Array.from(element.classList)
         .filter(cls => cls && !cls.includes(':') && !cls.includes('[') && cls.length > 2);
-    if (stableClasses.length > 0) {
-        selector += '.' + stableClasses.join('.');
-    }
+    if (stableClasses.length > 0) selector += '.' + stableClasses.join('.');
 
     const siblings = Array.from(parent.children);
     const elementsWithSameSelector = siblings.filter(sibling => sibling.matches(selector));
@@ -110,21 +93,10 @@ function getRelativeCSS(element, parent) {
         const index = elementsWithSameSelector.indexOf(element);
         selector += `:nth-of-type(${index + 1})`;
     }
-    
     return selector;
 }
 
-/**
- * Checks if a locator is unique within a given scope (or document).
- * @param {string} locator - The locator method (e.g., 'getByRole').
- * @param {any} value - The primary value for the locator.
- * @param {Element} targetElement - The element we expect to find.
- * @param {Element} [scope=document] - The scope to search within.
- * @returns {boolean} - True if the locator finds only the targetElement within the scope.
- */
 function isLocatorUniqueInScope(locator, value, targetElement, scope = document) {
-    // This is a simplified check. A full-blown Playwright engine is not available.
-    // We check for the most common cases.
     if (locator === 'getByRole') {
         const elements = Array.from(scope.querySelectorAll('*')).filter(el => getImplicitRole(el) === value);
         return elements.length === 1 && elements[0] === targetElement;
@@ -132,15 +104,6 @@ function isLocatorUniqueInScope(locator, value, targetElement, scope = document)
     return false;
 }
 
-
-// --- CORE LOCATOR GENERATION LOGIC ---
-
-/**
- * The main function to generate the best possible Playwright locator.
- * @param {Element} element - The target DOM element.
- * @param {string} framework - The target framework ('pytest' or 'js').
- * @returns {string|null} - The generated Playwright locator string or null on failure.
- */
 function generateBestLocator(element, framework) {
     const isPytest = framework === 'pytest';
     const escapeStr = (str) => str.replace(/"/g, '\\"');
@@ -148,33 +111,21 @@ function generateBestLocator(element, framework) {
     const formatLocator = (method, value, options = null) => {
         const methodName = isPytest ? method.replace(/([A-Z])/g, '_$1').toLowerCase() : method;
         const formattedValue = `"${escapeStr(value)}"`;
-
-        if (!options) {
-            return `page.${methodName}(${formattedValue})`;
-        }
-        
+        if (!options) return `page.${methodName}(${formattedValue})`;
         const optionsStr = isPytest
             ? Object.entries(options).map(([k, v]) => `${k}=${typeof v === 'boolean' ? (v ? 'True' : 'False') : `"${escapeStr(v)}"`}`).join(', ')
             : `{ ${Object.entries(options).map(([k, v]) => `${k}: ${typeof v === 'boolean' ? v : `"${escapeStr(v)}"`}`).join(', ')} }`;
-            
         return `page.${methodName}(${formattedValue}, ${optionsStr})`;
     };
 
-    // --- Strategy 1: Test ID (Highest Priority) ---
     const testId = element.getAttribute('data-testid') || element.getAttribute('data-qa') || element.getAttribute('data-test');
-    if (testId) {
-        return formatLocator('getByTestId', testId);
-    }
+    if (testId) return formatLocator('getByTestId', testId);
 
     const role = getImplicitRole(element);
     const accName = getAccessibleName(element);
 
-    // --- Strategy 2: Role + Accessible Name (Very Robust) ---
-    if (role && accName) {
-        return formatLocator('getByRole', role, { name: accName, exact: true });
-    }
+    if (role && accName) return formatLocator('getByRole', role, { name: accName, exact: true });
 
-    // --- Strategy 3: Other Semantic `getBy` Locators ---
     const placeholder = element.getAttribute('placeholder');
     if (placeholder) return formatLocator('getByPlaceholder', placeholder, { exact: true });
 
@@ -183,28 +134,19 @@ function generateBestLocator(element, framework) {
 
     if (accName) return formatLocator('getByText', accName, { exact: true });
     
-    // --- Strategy 4: Role without Name (if globally unique) ---
     if (role && isLocatorUniqueInScope('getByRole', role, element, document)) {
         return formatLocator('getByRole', role);
     }
     
-    // --- Strategy 5: Chaining (Parent-Child) ---
     let parentElement = element.parentElement;
     for (let i = 0; i < 4 && parentElement && parentElement.tagName !== 'BODY'; i++) {
         const parentLocator = generateBestLocator(parentElement, framework);
-        // Ensure the parent locator is stable (not a CSS fallback)
         if (parentLocator && !parentLocator.includes('locator(') && !parentLocator.includes('WARNING')) {
-            // Now, find a simple, relative locator for the child.
             let childLocator;
-            if (role) {
-                // Check if getByRole is unique *within this parent*
-                if (isLocatorUniqueInScope('getByRole', role, element, parentElement)) {
-                    childLocator = formatLocator('getByRole', role).replace(/^page\./, '');
-                    return `${parentLocator}.${childLocator}`;
-                }
+            if (role && isLocatorUniqueInScope('getByRole', role, element, parentElement)) {
+                childLocator = formatLocator('getByRole', role).replace(/^page\./, '');
+                return `${parentLocator}.${childLocator}`;
             }
-
-            // Fallback to a simple relative CSS for the child
             const relativeCSS = getRelativeCSS(element, parentElement);
             if (parentElement.querySelectorAll(relativeCSS).length === 1) {
                 const childCssLocator = `locator("${escapeStr(relativeCSS)}")`;
@@ -214,23 +156,75 @@ function generateBestLocator(element, framework) {
         parentElement = parentElement.parentElement;
     }
     
-    // --- Strategy 6: CSS Selector (Last Resort) ---
     const cssSelector = getRelativeCSS(element, element.parentElement);
     const locator = `page.locator("${escapeStr(cssSelector)}")`;
     const comment = isPytest 
-        ? "# WARNING: CSS selector fallback. Consider adding a data-testid or a more specific parent." 
-        : "// WARNING: CSS selector fallback. Consider adding a data-testid or a more specific parent.";
+        ? "# WARNING: CSS selector fallback. Consider adding a data-testid." 
+        : "// WARNING: CSS selector fallback. Consider adding a data-testid.";
     return `${locator} ${comment}`;
 }
 
+function findAndHighlight(locatorString) {
+    document.querySelectorAll('[data-playwright-verifier-highlight]').forEach(el => {
+        el.style.outline = '';
+        el.removeAttribute('data-playwright-verifier-highlight');
+    });
 
-// --- EVENT HANDLERS AND UI (largely unchanged, but with English strings) ---
+    let foundElements = [];
+    try {
+        const cssElements = Array.from(document.querySelectorAll(locatorString));
+        if (cssElements.length > 0 && !locatorString.includes('getBy')) {
+            foundElements = cssElements;
+        }
+    } catch (e) { /* Ignore invalid CSS selector errors */ }
+
+    if (foundElements.length === 0) {
+        const locatorMatch = locatorString.match(/(getBy[A-Za-z]+)\s*\((.*)\)/);
+        const locatorCssMatch = locatorString.match(/locator\s*\(\s*(['"`])(.*?)\1\s*\)/);
+
+        if (locatorCssMatch) {
+            foundElements = Array.from(document.querySelectorAll(locatorCssMatch[2]));
+        } else if (locatorMatch) {
+            const method = locatorMatch[1];
+            const rawArgs = locatorMatch[2].trim();
+            const argMatch = rawArgs.match(/['"`](.*?)['"`]/);
+            if (argMatch) {
+                const value = argMatch[1];
+                const allVisibleElements = Array.from(document.querySelectorAll('*')).filter(el => el.offsetParent !== null);
+                foundElements = allVisibleElements.filter(el => {
+                    // For the verifier, we use a slightly different logic to match user intent
+                    switch (method) {
+                        case 'getByRole':
+                            // Allow matching by role AND name if provided in options
+                            const nameMatch = rawArgs.match(/name\s*:\s*['"`](.*?)['"`]/);
+                            if (nameMatch) {
+                                return getImplicitRole(el) === value && getAccessibleName(el).includes(nameMatch[1]);
+                            }
+                            return getImplicitRole(el) === value;
+                        case 'getByText': return (el.innerText || el.textContent || "").trim().includes(value);
+                        case 'getByLabel': return getAccessibleName(el).includes(value);
+                        case 'getByPlaceholder': return el.getAttribute('placeholder') === value;
+                        case 'getByAltText': return el.getAttribute('alt') === value;
+                        case 'getByTitle': return el.getAttribute('title') === value;
+                        case 'getByTestId': return (el.getAttribute('data-testid') || el.getAttribute('data-qa') || el.getAttribute('data-test')) === value;
+                        default: return false;
+                    }
+                });
+            }
+        }
+    }
+    
+    foundElements.forEach(el => {
+        el.style.outline = '3px solid #ff4757';
+        el.setAttribute('data-playwright-verifier-highlight', 'true');
+    });
+    return foundElements.length;
+}
 
 function handlePageClick(event) {
     if (!isPickingMode) return;
     event.preventDefault();
     event.stopPropagation();
-
     try {
         const generatedLocator = generateBestLocator(event.target, currentFramework);
         if (generatedLocator) {
@@ -266,22 +260,13 @@ function disablePickingMode() {
 function displayLocatorOnPage(text, isError = false) {
     hideLocatorDisplay();
     locatorDisplayDiv = document.createElement('div');
-    const panelColor = isError ? '#e06c75' : '#61afef'; // Red for error, blue for success
-    locatorDisplayDiv.style.cssText = `
-        position: fixed; top: 20px; right: 20px; background-color: #282c34;
-        color: #abb2bf; padding: 16px; border-radius: 8px; border-left: 4px solid ${panelColor};
-        font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 14px;
-        z-index: 2147483647; box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-        display: flex; align-items: center; gap: 15px; max-width: 600px;
-    `;
-
+    const panelColor = isError ? '#e06c75' : '#61afef';
+    locatorDisplayDiv.style.cssText = `position: fixed; top: 20px; right: 20px; background-color: #282c34; color: #abb2bf; padding: 16px; border-radius: 8px; border-left: 4px solid ${panelColor}; font-family: 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 14px; z-index: 2147483647; box-shadow: 0 8px 20px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 15px; max-width: 600px;`;
     const locatorText = document.createElement('code');
     locatorText.textContent = text;
     locatorText.style.cssText = 'white-space: pre-wrap; word-break: break-all; user-select: all; flex-grow: 1;';
-
     const buttonContainer = document.createElement('div');
     buttonContainer.style.cssText = 'display: flex; gap: 10px;';
-
     const copyButton = document.createElement('button');
     copyButton.textContent = 'Copy';
     copyButton.style.cssText = `background-color: #61afef; color: #282c34; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 13px; font-weight: bold;`;
@@ -296,19 +281,16 @@ function displayLocatorOnPage(text, isError = false) {
             }, 2000);
         });
     };
-
     const closeButton = document.createElement('button');
     closeButton.textContent = 'Close';
     closeButton.style.cssText = `background-color: #4b5263; color: #abb2bf; border: none; padding: 6px 12px; border-radius: 5px; cursor: pointer; font-size: 13px;`;
     closeButton.onclick = hideLocatorDisplay;
-
     locatorDisplayDiv.appendChild(locatorText);
     if (!isError) {
         buttonContainer.appendChild(copyButton);
     }
     buttonContainer.appendChild(closeButton);
     locatorDisplayDiv.appendChild(buttonContainer);
-    
     document.body.appendChild(locatorDisplayDiv);
 }
 
@@ -332,6 +314,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-// Initial state
 disablePickingMode();
 hideLocatorDisplay();

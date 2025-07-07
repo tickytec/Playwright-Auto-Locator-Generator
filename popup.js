@@ -1,19 +1,23 @@
+/**
+ * @file popup.js
+ * This script manages the UI and interactions within the extension's popup.
+ * It communicates with the content script (content.js) to trigger actions on the page.
+ */
 document.addEventListener('DOMContentLoaded', function() {
-    // === Elements for Locator Generator ===
+    // === UI Elements ===
     const pickElementButton = document.getElementById('pickElementButton');
     const locatorOutputDiv = document.getElementById('locatorOutput');
     const copyLocatorButton = document.getElementById('copyLocatorButton');
     const frameworkSelector = document.querySelectorAll('input[name="framework"]');
-
-    // === Elements for Selector Verifier ===
     const checkButton = document.getElementById('checkButton');
     const locatorInput = document.getElementById('locatorInput');
     const messageDiv = document.getElementById('message');
 
+    // === State Variables ===
     let currentLocator = '';
     let selectedFramework = 'pytest';
 
-    // --- Part 0: Load stored preferences and locator ---
+    // --- Part 1: Initialization ---
     chrome.storage.local.get(['lastGeneratedLocator', 'selectedFramework'], function(result) {
         if (result.lastGeneratedLocator) {
             locatorOutputDiv.textContent = result.lastGeneratedLocator;
@@ -28,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- Part 1: Locator Generator Logic ---
+    // --- Part 2: Locator Generator Logic ---
     frameworkSelector.forEach(radio => {
         radio.addEventListener('change', function() {
             selectedFramework = this.value;
@@ -45,7 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 if (response && response.status === "enabled") {
-                    window.close();
+                    window.close(); // Close popup to allow user to click on the page
                 }
             });
         });
@@ -53,20 +57,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     copyLocatorButton.addEventListener('click', function() {
         if (currentLocator) {
-            navigator.clipboard.writeText(currentLocator).then(() => {
+            const pureLocator = currentLocator.split(/ (#|\/\/)/)[0].trim();
+            navigator.clipboard.writeText(pureLocator).then(() => {
                 copyLocatorButton.textContent = 'Copied!';
                 setTimeout(() => { copyLocatorButton.textContent = 'Copy Locator'; }, 1500);
             });
         }
     });
 
-    // --- Part 2: Selector Verifier Logic (RESTORED) ---
+    // --- Part 3: Selector Verifier Logic ---
     checkButton.addEventListener('click', function() {
         const selector = locatorInput.value.trim();
-        messageDiv.style.display = 'block'; // Show message area
+        messageDiv.style.display = 'block';
         if (!selector) {
-            messageDiv.textContent = 'Please enter a CSS selector.';
-            messageDiv.style.color = '#d9534f'; // Red
+            messageDiv.textContent = 'Please enter a selector or locator.';
+            messageDiv.style.color = '#d9534f';
             return;
         }
 
@@ -76,53 +81,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 messageDiv.style.color = '#d9534f';
                 return;
             }
+            
+            // =================================================================
+            // THIS IS THE CORRECTED PART
+            // =================================================================
             chrome.scripting.executeScript({
                 target: { tabId: tabs[0].id },
-                function: highlightElements,
-                args: [selector]
+                // We pass an anonymous function that will be executed on the page.
+                // This function can then call `findAndHighlight` because it exists on the page.
+                func: (selectorToFind) => {
+                    // This code runs inside the web page's context
+                    return findAndHighlight(selectorToFind);
+                },
+                args: [selector] // Pass the user's input as an argument to our anonymous function
             }, (results) => {
                 if (chrome.runtime.lastError) {
-                    messageDiv.textContent = `Error: ${chrome.runtime.lastError.message}`;
+                    messageDiv.textContent = `Error: ${chrome.runtime.lastError.message}. Try refreshing the page.`;
                     messageDiv.style.color = '#d9534f';
                 } else if (results && results[0] && results[0].result !== undefined) {
                     const count = results[0].result;
                     if (count > 0) {
                         messageDiv.textContent = `Found and highlighted ${count} element(s).`;
-                        messageDiv.style.color = '#5cb85c'; // Green
+                        messageDiv.style.color = '#5cb85c';
                     } else {
-                        messageDiv.textContent = 'No elements found with this selector.';
-                        messageDiv.style.color = '#f0ad4e'; // Orange
+                        messageDiv.textContent = 'No elements found with this locator.';
+                        messageDiv.style.color = '#f0ad4e';
                     }
+                } else {
+                    // This case handles when the script injection itself fails without a chrome.runtime error
+                    messageDiv.textContent = 'Could not execute script on the page. It may be protected.';
+                    messageDiv.style.color = '#d9534f';
                 }
             });
         });
     });
 
-    // This function is injected into the page to find and highlight elements
-    function highlightElements(selector) {
-        // Clear previous highlights first
-        document.querySelectorAll('[data-locator-checker-highlight]').forEach(el => {
-            el.style.outline = '';
-            el.removeAttribute('data-locator-checker-highlight');
-        });
-
-        try {
-            const elements = document.querySelectorAll(selector);
-            elements.forEach(el => {
-                el.style.outline = '3px solid #ff4757'; // A bright red outline
-                el.dataset.locatorCheckerHighlight = 'true';
-            });
-            return elements.length;
-        } catch (e) {
-            // This will catch invalid CSS selectors
-            return 0;
-        }
-    }
-
-
-    // --- Part 3: Listen for messages from content script ---
+    // --- Part 4: Listen for messages from content script ---
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        if (request.action === "elementPickedAndGenerated") {
+        if (request.action === "elementPicked") {
             const generatedLocator = request.locator;
             locatorOutputDiv.textContent = generatedLocator;
             currentLocator = generatedLocator;
