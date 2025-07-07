@@ -1,0 +1,22 @@
+{
+    "manifest_version": 3,
+    "name": "Playwright Locator Generator",
+    "version": "1.13",
+    "description": "Generate Playwright locators by picking elements on the page for Python and JavaScript.",
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png",
+            "128": "icons/icon128.png"
+        }
+    },
+    "permissions": ["activeTab", "scripting", "storage"],
+    "host_permissions": ["<all_urls>"],
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["content.js"]
+        }
+    ]
+}
