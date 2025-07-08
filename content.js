@@ -192,23 +192,41 @@ function findAndHighlight(locatorString) {
                 const value = argMatch[1];
                 const allVisibleElements = Array.from(document.querySelectorAll('*')).filter(el => el.offsetParent !== null);
                 foundElements = allVisibleElements.filter(el => {
-                    // For the verifier, we use a slightly different logic to match user intent
+      
                     switch (method) {
                         case 'getByRole':
-                            // Allow matching by role AND name if provided in options
-                            const nameMatch = rawArgs.match(/name\s*:\s*['"`](.*?)['"`]/);
+                         
+                            const nameMatch = rawArgs.match(/name\s*[=:]\s*['"`](.*?)['"`]/);
                             if (nameMatch) {
                                 return getImplicitRole(el) === value && getAccessibleName(el).includes(nameMatch[1]);
                             }
                             return getImplicitRole(el) === value;
-                        case 'getByText': return (el.innerText || el.textContent || "").trim().includes(value);
-                        case 'getByLabel': return getAccessibleName(el).includes(value);
-                        case 'getByPlaceholder': return el.getAttribute('placeholder') === value;
-                        case 'getByAltText': return el.getAttribute('alt') === value;
-                        case 'getByTitle': return el.getAttribute('title') === value;
-                        case 'getByTestId': return (el.getAttribute('data-testid') || el.getAttribute('data-qa') || el.getAttribute('data-test')) === value;
-                        default: return false;
+
+                        case 'getByText': 
+                            return (el.innerText || el.textContent || "").trim().includes(value);
+                        
+                        case 'getByLabel': 
+                            return getAccessibleName(el).includes(value);
+
+                        case 'getByPlaceholder': 
+                           
+                            return el.getAttribute('placeholder')?.includes(value);
+
+                        case 'getByAltText': 
+                         
+                            return el.getAttribute('alt')?.includes(value);
+
+                        case 'getByTitle': 
+                         
+                            return el.getAttribute('title')?.includes(value);
+
+                        case 'getByTestId': 
+                            return (el.getAttribute('data-testid') || el.getAttribute('data-qa') || el.getAttribute('data-test')) === value;
+
+                        default: 
+                            return false;
                     }
+// ...
                 });
             }
         }

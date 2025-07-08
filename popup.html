@@ -1,44 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Privacy Policy</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 700px;
-      margin: 40px auto;
-      padding: 0 20px;
-      line-height: 1.6;
-      color: #333;
-    }
-    h1, h2 {
-      color: #2c3e50;
-    }
-    a {
-      color: #2980b9;
-      text-decoration: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Playwright Locator Assistant</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h1>Privacy Policy</h1>
-  <p>Last updated: July 2025</p>
 
-  <p>This extension (<strong>Playwright Locator Assistant</strong>) does not collect, store, or transmit any personal or sensitive user data.</p>
+    <div class="container">
+        <header class="header">
+            <img src="icons/icon48.png" alt="logo" class="logo">
+            <h1>Playwright Locator Assistant</h1>
+        </header>
 
-  <h2>Data Collection</h2>
-  <p>The extension processes data locally in your browser. It accesses the content of the web pages you visit only to generate Playwright locators when you use the extension.</p>
-  <p>No information is sent to any external servers or third parties.</p>
+        <div class="section">
+            <h2>1. Generate Locator</h2>
+            <div id="locatorOutput">Click "Pick Element" to start.</div>
+            <div class="framework-selector">
+                <label><input type="radio" name="framework" value="pytest" id="pytest" checked> Pytest</label>
+                <label><input type="radio" name="framework" value="js" id="js"> JS</label>
+            </div>
+            <div class="button-group">
+                <button id="pickElementButton" class="btn btn-primary">Pick Element</button>
+                <button id="copyLocatorButton" class="btn" style="display: none;">Copy Locator</button>
+            </div>
+        </div>
 
-  <h2>Data Usage</h2>
-  <p>No data is used outside your browser session. The extension does not collect personal, financial, or other sensitive information.</p>
+        <div class="divider"></div>
 
-  <h2>Security</h2>
-  <p>Since no data leaves your device, your privacy and security are maintained.</p>
+        <div class="section">
+            <h2>2. Verify Selector</h2>
+            <input type="text" id="locatorInput" placeholder="Enter CSS or Playwright locator...">
+            <button id="checkButton" class="btn">Check Selector</button>
+            <div id="message" style="display: none;"></div>
+        </div>
+    </div>
 
-  <h2>Contact Us</h2>
-  <p>If you have questions about this policy, please contact: <a href="mailto:khatskevich.mv@gmail.com">khatskevich.mv@gmail.com</a>.</p>
+    <script src="popup.js"></script>
 </body>
 </html>
